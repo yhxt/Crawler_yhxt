@@ -1,0 +1,71 @@
+import re
+import json
+import requests
+from requests.exceptions import RequestException
+
+def get_one_page(url):
+    '''1.爬取网页html文件'''
+    try:
+        # 作者发现猫眼电影现在对爬虫做了封锁，必须添加下面的headers才行，不然会被封禁
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.162 Safari/537.36'}
+        response = requests.get(url,headers=headers)
+        if response.status_code == 200:
+            return response.text
+        return None
+    except RequestException:
+        return None
+
+def parse_one_page(html):
+    '''2.通过正则表达式对爬取的html文件进行清洗（匹配）'''
+    # 正则表达式匹配排名：<dd>.*?board-index.*?>(\d+)</i>
+    # 封面图：.*?data-src="(.*?)"
+    # 电影名称：.*?name"><a.*?>(.*?)</a>
+    # 主演：.*?star">(.*?)</p>
+    # 上映时间：.*?releasetime">(.*?)</p>
+    # 评分左半部分：.*?integer">(.*?)</i>
+    # 评分右半部分：.*?fraction">(.*?)</i>
+    pattern = re.compile('<dd>.*?board-index.*?>(\d+)</i>'+
+                        '.*?data-src="(.*?)"'+
+                        '.*?name"><a.*?>(.*?)</a>'+
+                        '.*?star">(.*?)</p>'+
+                        '.*?releasetime">(.*?)</p>'+
+                        '.*?integer">(.*?)</i>'+
+                        '.*?fraction">(.*?)</i>', re.S)
+    items = re.findall(pattern,html)
+    # 对爬取数据进行整理
+    for item in items:
+        # print(item)
+        # print('index:'+item[0]),
+        # print('image:'+item[1]),
+        # print('title:'+item[2]),
+        # print('actor:'+item[3].strip()[3:]),
+        # print('time:'+item[4][5:]),
+        # print('scorce:'+item[5]+item[6]),
+        yield {
+            '排名':item[0],
+            '封面':item[1],
+            '电影名称':item[2],
+            '主演':item[3].strip()[3:],
+            '上映时间':item[4][5:],
+            '评分':item[5]+item[6]
+        }
+
+def write_to_file(content):
+    with open('result.txt','a',encoding='utf-8') as f:
+        # content是字典形式，需要通过json.dumps()将其转换成字符串,并加上换行符
+        f.write(json.dumps(content,ensure_ascii=False)+'\n')
+        f.close()
+
+def main():
+    '''3.主函数'''
+    url = 'http://maoyan.com/board/4'
+    html = get_one_page(url)
+    # 对爬取的结果进行遍历
+    for item in parse_one_page(html):
+        # print(item)
+        write_to_file(item)
+
+if __name__ == '__main__':
+    main()
+
+
